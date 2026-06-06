@@ -35,9 +35,9 @@ import traceback
 
 import numpy as np
 
-# Make sure bat_functions is importable from this folder
+# bat_functions is imported lazily inside the functions that need it so that
+# discovery and --dry-run work even when heavy deps (cv2, rasterio) are absent.
 sys.path.insert(0, os.path.dirname(__file__))
-from bat_functions import threshold_short_tracks, measure_crossing_bats
 
 # ---------------------------------------------------------------------------
 # Configuration — edit these paths to match your setup
@@ -166,6 +166,13 @@ def compute_crossing_tracks(camera_path, frame_height, dry_run=False):
         return True
 
     try:
+        from bat_functions import threshold_short_tracks, measure_crossing_bats
+    except ImportError as e:
+        print(err(f"    [B] Cannot import bat_functions ({e})"))
+        print(err(f"         Make sure cv2, scipy, etc. are installed in this environment."))
+        return False
+
+    try:
         raw_tracks = np.load(raw_file, allow_pickle=True)
         print(f"         {len(raw_tracks):,} raw tracks loaded")
 
@@ -204,10 +211,10 @@ def compile_observation(date, camera, camera_path,
     crossing_file = os.path.join(camera_path, "crossing_tracks.npy")
     blue_file     = os.path.join(camera_path, "blue-means.npy")
 
-    if not os.path.exists(crossing_file):
+    if not dry_run and not os.path.exists(crossing_file):
         print(warn(f"    [C] crossing_tracks.npy missing"))
         return False
-    if not os.path.exists(blue_file):
+    if not dry_run and not os.path.exists(blue_file):
         print(warn(f"    [C] blue-means.npy missing — "
                    f"run get-observation-frame-darkness.ipynb first"))
         return False
