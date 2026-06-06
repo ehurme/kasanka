@@ -109,42 +109,147 @@ def discover_camera_days(root):
 
 
 # ---------------------------------------------------------------------------
-# Stage A — assemble blue-means from per-clip files
+# Stage A — compute or assemble blue-means.npy
+#
+# Three sub-cases handled in priority order:
+#   A1. mean-blue-<clip>.npy files already exist → combine them
+#   A2. raw video files exist in/near the camera folder → read and compute
+#   A3. nothing found → return False
 # ---------------------------------------------------------------------------
 
-def assemble_blue_means(camera_path, dry_run=False):
+VIDEO_EXTENSIONS = ("*.MP4", "*.mp4", "*.MOV", "*.mov", "*.AVI", "*.avi")
+
+
+def _find_video_files(camera_path, video_root=None, date=None, camera=None):
+    """Return sorted list of video file paths for this camera-day."""
+    found = []
+    # Check directly inside the camera folder
+    for ext in VIDEO_EXTENSIONS:
+        found.extend(glob.glob(os.path.join(camera_path, ext)))
+    # Check in a parallel video root tree: video_root/<date>/<camera>/
+    if not found and video_root and date and camera:
+        search = os.path.join(video_root, date, camera)
+        for ext in VIDEO_EXTENSIONS:
+            found.extend(glob.glob(os.path.join(search, ext)))
+    return sorted(found)
+
+
+def _compute_blue_means_from_video(video_path):
+    """Read every frame of a video and return array of per-frame mean blue values."""
+    try:
+        import cv2
+    except ImportError:
+        raise RuntimeError("cv2 not available — install opencv-python-headless")
+
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise RuntimeError(f"Cannot open video: {video_path}")
+
+    means = []
+    frame_count = 0
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        # OpenCV loads as BGR; channel 0 is blue
+        means.append(float(np.mean(frame[..., 0])))
+        frame_count += 1
+        if frame_count % 10_000 == 0:
+            print(f"         {frame_count:,} frames processed ...", flush=True)
+
+    cap.release()
+    return np.array(means)
+
+
+def compute_blue_means(camera_path, video_root=None, date=None,
+                       camera=None, dry_run=False):
     """
-    Combine mean-blue-<clip>.npy files → blue-means.npy.
-    Returns True if blue-means.npy now exists (or already did).
+    Ensure blue-means.npy exists for this camera folder.
+
+    Priority:
+      1. Already done → return True immediately
+      2. Pre-computed per-clip mean-blue-*.npy files → assemble them
+      3. Raw video files found → compute from scratch
+      4. Nothing found → return False (needs manual attention)
     """
-    out_file = os.path.join(camera_path, "blue-means.npy")
+    out_file   = os.path.join(camera_path, "blue-means.npy")
+    clip_files = sorted(glob.glob(os.path.join(camera_path, "mean-blue-*.npy")))
+    video_files = _find_video_files(camera_path, video_root, date, camera)
+
     if os.path.exists(out_file):
         return True
 
-    clip_files = sorted(glob.glob(os.path.join(camera_path, "mean-blue-*.npy")))
-    if not clip_files:
-        return False
+    # --- A1: assemble pre-computed clips ---
+    if clip_files:
+        print(f"    [A] Assembling {len(clip_files)} clip file(s) → blue-means.npy")
+        if dry_run:
+            return True
+        try:
+            combined = np.hstack([np.load(f) for f in clip_files])
+            np.save(out_file, combined)
+            for f in clip_files:
+                os.remove(f)
+            print(ok(f"         {len(combined):,} frames assembled"))
+            return True
+        except Exception as e:
+            print(err(f"    [A1] FAILED: {e}"))
+            return False
 
-    print(f"    [A] Assembling {len(clip_files)} clip files → blue-means.npy")
-    if dry_run:
-        return True   # pretend it would succeed
-
-    try:
-        arrays = [np.load(f) for f in clip_files]
-        combined = np.hstack(arrays)
+    # --- A2: compute from raw video ---
+    if video_files:
+        print(f"    [A] Computing blue-means from {len(video_files)} video file(s) ...")
+        if dry_run:
+            return True
+        all_means = []
+        for vf in video_files:
+            vname = os.path.splitext(os.path.basename(vf))[0]
+            print(f"         {vname} ...", flush=True)
+            try:
+                means = _compute_blue_means_from_video(vf)
+                all_means.append(means)
+                print(ok(f"         {len(means):,} frames done"))
+            except Exception as e:
+                print(err(f"         FAILED: {e}"))
+                if args_verbose:
+                    traceback.print_exc()
+        if not all_means:
+            return False
+        combined = np.hstack(all_means)
         np.save(out_file, combined)
-        # remove intermediate per-clip files after combining
-        for f in clip_files:
-            os.remove(f)
+        print(ok(f"         blue-means.npy saved ({len(combined):,} total frames)"))
         return True
-    except Exception as e:
-        print(err(f"    [A] FAILED: {e}"))
-        return False
+
+    # --- A3: nothing available ---
+    return False
 
 
 # ---------------------------------------------------------------------------
 # Stage B — compute crossing tracks
 # ---------------------------------------------------------------------------
+
+def _fix_track_contours(tracks):
+    """Cast object-dtype contour arrays to float32 so cv2.minAreaRect accepts them.
+
+    Contours saved from different pipeline runs sometimes end up as numpy
+    object arrays rather than typed float/int arrays, which causes OpenCV to
+    raise 'points data type = object is not supported'.
+    """
+    for track in tracks:
+        if "contour" not in track:
+            continue
+        fixed = []
+        for c in track["contour"]:
+            if c is None or not hasattr(c, "dtype"):
+                fixed.append(c)
+            elif c.dtype == object:
+                try:
+                    fixed.append(np.array(c.tolist(), dtype=np.float32))
+                except Exception:
+                    fixed.append(None)  # drop unrecoverable contour
+            else:
+                fixed.append(c)
+        track["contour"] = fixed
+    return tracks
 
 def compute_crossing_tracks(camera_path, frame_height, dry_run=False):
     """
@@ -179,6 +284,7 @@ def compute_crossing_tracks(camera_path, frame_height, dry_run=False):
         tracks = threshold_short_tracks(raw_tracks, min_length_threshold=2)
         print(f"         {len(tracks):,} tracks after length filter")
 
+        tracks = _fix_track_contours(tracks)
         crossing_tracks = measure_crossing_bats(tracks, frame_height=frame_height)
         print(ok(f"         {len(crossing_tracks):,} crossing tracks found"))
 
@@ -273,7 +379,8 @@ def compile_observation(date, camera, camera_path,
 
 args_verbose = False   # set by argparse below
 
-def run(base, obs_root, frame_height, stages, date_filter, dry_run, verbose):
+def run(base, obs_root, frame_height, stages, date_filter, dry_run, verbose,
+        video_root=None):
     global args_verbose
     args_verbose = verbose
 
@@ -285,6 +392,8 @@ def run(base, obs_root, frame_height, stages, date_filter, dry_run, verbose):
     print(f"  Observations out: {obs_root}")
     print(f"  Frame height    : {frame_height} px")
     print(f"  Stages          : {', '.join(stages)}")
+    if video_root:
+        print(f"  Video root      : {video_root}")
     if date_filter:
         print(f"  Date filter     : {date_filter}")
     if dry_run:
@@ -298,16 +407,18 @@ def run(base, obs_root, frame_height, stages, date_filter, dry_run, verbose):
     # Only work on camera-days that are incomplete
     todo = []
     for cd in camera_days:
-        p = cd["path"]
-        needs_A = bool(glob.glob(os.path.join(p, "mean-blue-*.npy"))) and \
-                  not os.path.exists(os.path.join(p, "blue-means.npy"))
+        p      = cd["path"]
+        date   = cd["date"]
+        camera = cd["camera"]
+        blue_done = os.path.exists(os.path.join(p, "blue-means.npy"))
+        has_clips = bool(glob.glob(os.path.join(p, "mean-blue-*.npy")))
+        has_video = bool(_find_video_files(p, video_root, date, camera))
+        needs_A = not blue_done and (has_clips or has_video)
         needs_B = (os.path.exists(os.path.join(p, "raw_tracks.npy")) and
                    not os.path.exists(os.path.join(p, "crossing_tracks.npy")))
-        # Check observation
-        out_file = os.path.join(obs_root, cd["date"],
-                                f"{cd['date']}-observation-{cd['camera']}.npy")
+        out_file = os.path.join(obs_root, date, f"{date}-observation-{camera}.npy")
         needs_C = (os.path.exists(os.path.join(p, "crossing_tracks.npy")) or needs_B) and \
-                  (os.path.exists(os.path.join(p, "blue-means.npy")) or needs_A) and \
+                  (blue_done or needs_A) and \
                   not os.path.exists(out_file)
         if (needs_A and "A" in stages) or \
            (needs_B and "B" in stages) or \
@@ -341,7 +452,8 @@ def run(base, obs_root, frame_height, stages, date_filter, dry_run, verbose):
 
         # Stage A
         if "A" in stages and cd["needs_A"]:
-            ok_a = assemble_blue_means(path, dry_run)
+            ok_a = compute_blue_means(path, video_root=video_root,
+                                      date=date, camera=camera, dry_run=dry_run)
             if ok_a:
                 counts["A_done"] += 1
             else:
@@ -375,7 +487,7 @@ def run(base, obs_root, frame_height, stages, date_filter, dry_run, verbose):
     print("  Summary")
     print("=" * 64)
     if "A" in stages:
-        print(f"  Blue-means assembled : {counts['A_done']} done, "
+        print(f"  Blue-means computed  : {counts['A_done']} done, "
               f"{counts['A_skip']} skipped/failed")
     if "B" in stages:
         print(f"  Crossing tracks      : {counts['B_done']} done, "
@@ -394,13 +506,15 @@ def run(base, obs_root, frame_height, stages, date_filter, dry_run, verbose):
         1 for cd in todo
         if not os.path.exists(os.path.join(cd["path"], "blue-means.npy"))
         and not glob.glob(os.path.join(cd["path"], "mean-blue-*.npy"))
+        and not _find_video_files(cd["path"], video_root, cd["date"], cd["camera"])
     )
     if remaining_blue > 0:
         print()
-        print(warn(f"  {remaining_blue} camera-days still need blue-means.npy "
-                   f"(requires original video files)."))
-        print("  Run get-observation-frame-darkness.ipynb on those cameras,")
-        print("  then re-run this script to compile observations.")
+        print(warn(f"  {remaining_blue} camera-days still need blue-means.npy."))
+        print("  Options:")
+        print("    1. Provide --video-root pointing to the raw video files")
+        print("    2. Run get-observation-frame-darkness.ipynb on those cameras")
+        print("       then re-run this script to compile observations.")
 
     print()
 
@@ -421,6 +535,10 @@ def main():
                              "B=crossing tracks, C=observations)")
     parser.add_argument("--date", nargs="+", default=None,
                         help="Restrict to specific date(s), e.g. --date 20211201 20211207")
+    parser.add_argument("--video-root", default=None,
+                        help="Root folder containing raw videos in "
+                             "<video-root>/<date>/<camera>/ structure. "
+                             "Only needed if videos are not inside the camera data folders.")
     parser.add_argument("--dry-run", action="store_true",
                         help="Show what would be done without writing any files")
     parser.add_argument("--verbose", "-v", action="store_true",
@@ -435,6 +553,7 @@ def main():
         date_filter=args.date,
         dry_run=args.dry_run,
         verbose=args.verbose,
+        video_root=args.video_root,
     )
 
 
