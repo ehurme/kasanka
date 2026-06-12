@@ -47,8 +47,9 @@ YEAR_COLOURS = {
     2019: "#0077BB",
     2020: "#EE7733",
     2021: "#009988",
+    2022: "#CC3311",
 }
-YEAR_MARKERS = {2019: "o", 2020: "s", 2021: "^"}
+YEAR_MARKERS = {2019: "o", 2020: "s", 2021: "^", 2022: "D"}
 
 MONTH_ABBR = {"jan":1,"feb":2,"mar":3,"apr":4,"may":5,"jun":6,
               "jul":7,"aug":8,"sep":9,"oct":10,"nov":11,"dec":12}

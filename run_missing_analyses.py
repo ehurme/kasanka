@@ -80,7 +80,21 @@ def looks_like_date_name(name):
     import re
     months = r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)"
     return (bool(re.search(months, name.lower()))
-            or bool(re.fullmatch(r"\d{6,8}", name)))
+            or bool(re.fullmatch(r"\d{6,8}", name))
+            or bool(re.match(r"^\d{6}\s+Bat\s+Count", name, re.IGNORECASE)))
+
+
+def canonical_date(folder_name):
+    """Convert folder name to a canonical date string.
+
+    '221101 Bat Count' -> '20221101'
+    Anything else returned unchanged.
+    """
+    import re
+    m = re.match(r"^(\d{2})(\d{2})(\d{2})\s+Bat\s+Count", folder_name, re.IGNORECASE)
+    if m:
+        return f"20{m.group(1)}{m.group(2)}{m.group(3)}"
+    return folder_name
 
 
 def looks_like_camera_folder(path):
@@ -91,7 +105,11 @@ def looks_like_camera_folder(path):
 
 
 def discover_camera_days(root):
-    """Return list of {date, camera, path} dicts."""
+    """Return list of {date, camera, path} dicts.
+
+    date is always a canonical string (e.g. '20221101', '16-Nov-2020');
+    '221101 Bat Count' folder names are normalised to '20221101'.
+    """
     entries = []
     skip = {"plots", "example-frames", "observations", "counts", "__pycache__"}
     for item in sorted(os.listdir(root)):
@@ -101,10 +119,11 @@ def discover_camera_days(root):
         if not os.path.isdir(item_path):
             continue
         if looks_like_date_name(item):
+            date_key = canonical_date(item)
             for sub in sorted(os.listdir(item_path)):
                 sub_path = os.path.join(item_path, sub)
                 if os.path.isdir(sub_path) and looks_like_camera_folder(sub_path):
-                    entries.append({"date": item, "camera": sub, "path": sub_path})
+                    entries.append({"date": date_key, "camera": sub, "path": sub_path})
     return entries
 
 

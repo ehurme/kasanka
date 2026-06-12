@@ -68,7 +68,16 @@ def looks_like_camera_folder(path):
 def looks_like_date_name(name):
     months = r"(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)"
     return (bool(re.search(months, name.lower()))
-            or bool(re.fullmatch(r"\d{6,8}", name)))
+            or bool(re.fullmatch(r"\d{6,8}", name))
+            or bool(re.match(r"^\d{6}\s+Bat\s+Count", name, re.IGNORECASE)))
+
+
+def canonical_date(folder_name):
+    """'221101 Bat Count' -> '20221101', anything else unchanged."""
+    m = re.match(r"^(\d{2})(\d{2})(\d{2})\s+Bat\s+Count", folder_name, re.IGNORECASE)
+    if m:
+        return f"20{m.group(1)}{m.group(2)}{m.group(3)}"
+    return folder_name
 
 
 def discover_camera_days(root):
@@ -90,6 +99,7 @@ def discover_camera_days(root):
 
         # Date folder → camera subfolders
         if looks_like_date_name(item):
+            date_key = canonical_date(item)
             try:
                 subs = sorted(os.listdir(item_path))
             except (PermissionError, OSError):
@@ -98,7 +108,7 @@ def discover_camera_days(root):
                 sub_path = os.path.join(item_path, sub)
                 if os.path.isdir(sub_path) and looks_like_camera_folder(sub_path):
                     entries.append({
-                        "date": item,
+                        "date": date_key,
                         "camera": sub,
                         "path": sub_path
                     })

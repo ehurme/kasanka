@@ -38,6 +38,7 @@ YEAR_FOLDER = {
     "2019": "2019",      # 6 dates: late-Nov through mid-Dec
     "2020": "2020",      # 8 dates: Oct through Dec
     "2021": "2021",      # 9 dates: Oct through Dec (Dec incomplete)
+    "2022": "2022",      # 7 dates: Nov through Dec (add once estimates run)
 }
 
 # Dates to exclude — empty (0) or pre-migration noise
@@ -51,12 +52,14 @@ YEAR_COLOURS = {
     "2019": "#0077BB",   # blue
     "2020": "#EE7733",   # orange
     "2021": "#009988",   # teal
+    "2022": "#CC3311",   # red
 }
 
 YEAR_LIGHT = {
     "2019": "#99CCEE",
     "2020": "#FFCC99",
     "2021": "#99DDD5",
+    "2022": "#FFBBAA",
 }
 
 # ---------------------------------------------------------------------------

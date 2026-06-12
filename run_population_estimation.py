@@ -116,6 +116,18 @@ CAMERA_LOCATIONS = {
     "Musole Tower":      [-12.589434,   30.244736],
     "KKCamera":          [-12.589434,   30.244736],   # KK's Camera = MusolaTower area
     "KK's Camera":       [-12.589434,   30.244736],
+
+    # 2022 numbered camera names  ("N CameraName" format)
+    "1 Fibwe Parking":   [-12.5903393,  30.2525047],
+    "2 BBC":             [-12.5863538,  30.2484985],
+    "3 Chinyangali":     [-12.5851284,  30.245529],
+    "4 Not Chinyangali": [-12.5849206,  30.2436135],
+    "5 Puku":            [-12.584838,   30.24137],
+    "6 Sunset":          [-12.585784,   30.240003],
+    # "7 Bupata" — coordinates unknown; add once GPS is available
+    "8 Musola Path":     [-12.589544,   30.242488],
+    "9 KK":              [-12.589434,   30.244736],
+    "10 Fibwe Management": [-12.592537, 30.2515924],
 }
 
 # ---------------------------------------------------------------------------
@@ -212,6 +224,7 @@ def discover_observations(obs_root):
 def year_of(date_str):
     if re.fullmatch(r"\d{8}", date_str):
         return date_str[:4]
+    if re.search(r"2022", date_str): return "2022"
     if re.search(r"2019", date_str): return "2019"
     if re.search(r"2020", date_str): return "2020"
     if re.search(r"2021", date_str): return "2021"
