@@ -124,7 +124,7 @@ CAMERA_LOCATIONS = {
     "4 Not Chinyangali": [-12.5849206,  30.2436135],
     "5 Puku":            [-12.584838,   30.24137],
     "6 Sunset":          [-12.585784,   30.240003],
-    # "7 Bupata" — coordinates unknown; add once GPS is available
+    "7 Bupata":          [-12.589337,   30.238492],
     "8 Musola Path":     [-12.589544,   30.242488],
     "9 KK":              [-12.589434,   30.244736],
     "10 Fibwe Management": [-12.592537, 30.2515924],
