@@ -24,9 +24,19 @@ import pickle
 import re
 import sys
 import time
+import warnings
 
 import cv2
 import numpy as np
+
+# GoPro MP4s have multiple streams (video + audio + GPS telemetry).
+# Raise OpenCV's packet-read retry limit and network timeout so it doesn't
+# spam warnings when reading large files over a network share.
+os.environ.setdefault("OPENCV_FFMPEG_READ_ATTEMPTS", "10000")
+os.environ.setdefault("OPENCV_FFMPEG_CAPTURE_OPTIONS", "timeout;120000000")
+
+# Suppress the torch.load FutureWarning — our model file is trusted.
+warnings.filterwarnings("ignore", category=FutureWarning, module="torch")
 
 # ---------------------------------------------------------------------------
 # Defaults — edit these or override with CLI args
@@ -132,7 +142,7 @@ def load_model(model_file):
     from bat_seg_models import UNETTraditional
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = UNETTraditional(1, 2, should_pad=False)
-    model.load_state_dict(torch.load(model_file, map_location=device))
+    model.load_state_dict(torch.load(model_file, map_location=device, weights_only=False))
     model.to(device)
     model.train(False)
     return model, device
