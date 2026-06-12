@@ -41,7 +41,7 @@ MODEL_FILE   = (r"C:\Users\Edward\Dropbox\bats-code\models"
                 r"\model_UNETTraditional_epochs_100_batcheff_16_lr_0.01"
                 r"_momentum_0.9_aug_better-norm-aug-2d-20Nov-big-dataset.tar")
 
-DATA_DIR     = r"C:\Users\Edward\Dropbox\bats-code\data"
+DATA_DIR     = r"C:\Users\Edward\Dropbox\bats-code (1)\data"
 
 BAT_PROB_THRESH   = 0.6
 SAVE_EVERY_N      = 1350   # save an example frame every N frames
