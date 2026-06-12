@@ -32,7 +32,8 @@ import numpy as np
 # Defaults — edit these or override with CLI args
 # ---------------------------------------------------------------------------
 
-CAMERAS_ROOT = r"E:\KasankaCameras"
+CAMERAS_ROOT = (r"\\10.0.16.7\grpDechmann\Postdoc-EdwardHurme"
+                r"\Eidolon_helvum\KasankaCameras")
 OUTPUT_ROOT  = (r"\\10.0.16.7\grpdechmann\Postdoc-EdwardHurme"
                 r"\Eidolon_helvum\kasanka-bats")
 
@@ -55,21 +56,27 @@ MONTH_ABBR_NUM = {"jan":"01","feb":"02","mar":"03","apr":"04","may":"05",
                   "nov":"11","dec":"12"}
 
 def canonical_date(folder_name):
-    """'221101 Bat Count' or '221101BatCount' -> '20221101'. Others unchanged."""
-    m = re.match(r"^(\d{2})(\d{2})(\d{2})\s*(?:Bat\s*Count)?$",
-                 folder_name.strip(), re.IGNORECASE)
-    if m and re.search(r"Bat", folder_name, re.IGNORECASE):
+    """'221101 Bat Count' -> '20221101', '20221101' unchanged, others unchanged."""
+    s = folder_name.strip()
+    # YYMMDD Bat Count  e.g. '221101 Bat Count'
+    m = re.match(r"^(\d{2})(\d{2})(\d{2})\s+Bat\s+Count", s, re.IGNORECASE)
+    if m:
         return f"20{m.group(1)}{m.group(2)}{m.group(3)}"
-    # Pure 6-digit: 221101 -> 20221101
-    if re.fullmatch(r"\d{6}", folder_name.strip()):
-        return f"20{folder_name.strip()}"
+    # Pure 6-digit YYMMDD  e.g. '221101'
+    if re.fullmatch(r"\d{6}", s):
+        return f"20{s}"
     return folder_name
 
 
 def find_videos(camera_path):
-    vids = []
+    """Return sorted unique video file paths (case-insensitive dedup for Windows)."""
+    seen, vids = set(), []
     for ext in ("*.MP4", "*.mp4", "*.MOV", "*.mov", "*.AVI", "*.avi"):
-        vids.extend(glob.glob(os.path.join(camera_path, ext)))
+        for f in glob.glob(os.path.join(camera_path, ext)):
+            key = f.lower()
+            if key not in seen:
+                seen.add(key)
+                vids.append(f)
     return sorted(vids)
 
 

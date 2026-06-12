@@ -30,8 +30,10 @@ sys.path.insert(0, os.path.dirname(__file__))
 OUTPUT_ROOT = (r"\\10.0.16.7\grpdechmann\Postdoc-EdwardHurme"
                r"\Eidolon_helvum\kasanka-bats")
 
-OVERLAP_FRAMES = 450   # 15 seconds at 30 fps — overlap between temporal chunks
-N_CHUNKS       = 10    # number of temporal chunks per observation
+OVERLAP_FRAMES   = 450   # 15 seconds at 30 fps — overlap between temporal chunks
+N_CHUNKS         = 10    # number of temporal chunks per observation
+DEFAULT_WORKERS  = 20    # AMD Ryzen Threadripper 3960X has 24 cores / 48 threads;
+                         # 20 workers leaves headroom for OS and file I/O
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -248,8 +250,9 @@ def main():
                         help="Root kasanka-bats folder")
     parser.add_argument("--year", nargs="+", default=None,
                         help="Limit to specific year(s), e.g. --year 2022")
-    parser.add_argument("--workers", type=int, default=1,
-                        help="Number of parallel tracking workers (default: 1)")
+    parser.add_argument("--workers", type=int, default=DEFAULT_WORKERS,
+                        help=f"Parallel tracking workers (default: {DEFAULT_WORKERS} "
+                             f"— tuned for 24-core Threadripper)")
     parser.add_argument("--dry-run",  action="store_true")
     parser.add_argument("--verbose",  action="store_true")
     args = parser.parse_args()
