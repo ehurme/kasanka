@@ -32,8 +32,8 @@ import numpy as np
 # GoPro MP4s have multiple streams (video + audio + GPS telemetry).
 # Raise OpenCV's packet-read retry limit and network timeout so it doesn't
 # spam warnings when reading large files over a network share.
-os.environ.setdefault("OPENCV_FFMPEG_READ_ATTEMPTS", "10000")
-os.environ.setdefault("OPENCV_FFMPEG_CAPTURE_OPTIONS", "timeout;120000000")
+os.environ["OPENCV_FFMPEG_READ_ATTEMPTS"] = "10000"
+os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "timeout;120000000"
 
 # Suppress the torch.load FutureWarning — our model file is trusted.
 warnings.filterwarnings("ignore", category=FutureWarning, module="torch")
