@@ -42,8 +42,7 @@ warnings.filterwarnings("ignore", category=FutureWarning, module="torch")
 # Defaults — edit these or override with CLI args
 # ---------------------------------------------------------------------------
 
-CAMERAS_ROOT = (r"\\10.0.16.7\grpDechmann\Postdoc-EdwardHurme"
-                r"\Eidolon_helvum\KasankaCameras")
+CAMERAS_ROOT = r"E:\KasankaCameras"   # local copy — much faster than network share
 OUTPUT_ROOT  = (r"\\10.0.16.7\grpdechmann\Postdoc-EdwardHurme"
                 r"\Eidolon_helvum\kasanka-bats")
 
