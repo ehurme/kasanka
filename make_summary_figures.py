@@ -41,14 +41,17 @@ YEAR_FOLDER = {
     "2022": "2022",      # 7 dates: Nov through Dec (add once estimates run)
 }
 
-# Dates to exclude — empty (0), pre-migration noise, or failed deployments
-# 2022 failures sourced from 22 Deployment.xlsx ("Successful Full round?" = N)
-EXCLUDE_DATES = {
-    "30-Oct-2020",
+# Dates with no/negligible data — skipped entirely
+EXCLUDE_DATES = {"30-Oct-2020"}
+
+# 2022 dates with confirmed field issues (source: 22 Deployment.xlsx).
+# Still included in figures but drawn with reduced emphasis (open markers, dashed CI).
+# Validated rounds (Successful Full round? = Y): 20221101, 20221116, 20221213
+UNCERTAIN_DATES = {
     "20221107",   # heavy rain, tripods blew over
-    "20221124",   # multiple failures
+    "20221124",   # multiple failures / battery dead
     "20221201",   # incomplete recordings
-    "20221219",   # failed recordings
+    "20221219",   # recording failures
 }
 
 # ---------------------------------------------------------------------------
@@ -184,15 +187,35 @@ def fig_time_series(all_data, save_dir=None):
         light      = YEAR_LIGHT[yr]
 
         sorted_dates = sorted(dates_dict.keys())
-        days   = [day_of_season(d) for d in sorted_dates]
-        meds   = [np.median(dates_dict[d]) / 1e6 for d in sorted_dates]
-        lo     = [np.percentile(dates_dict[d],  5) / 1e6 for d in sorted_dates]
-        hi     = [np.percentile(dates_dict[d], 95) / 1e6 for d in sorted_dates]
 
-        ax.fill_between(days, lo, hi, color=light, alpha=0.7, linewidth=0)
-        line, = ax.plot(days, meds, "o-", color=colour, linewidth=2,
-                        markersize=6, markerfacecolor="white",
-                        markeredgewidth=2, label=yr, zorder=3)
+        # Split into validated vs uncertain (uncertain = flagged field issues)
+        certain  = [d for d in sorted_dates
+                    if d.strftime("%Y%m%d") not in UNCERTAIN_DATES]
+        uncertain = [d for d in sorted_dates
+                     if d.strftime("%Y%m%d") in UNCERTAIN_DATES]
+
+        # --- Validated dates: solid fill + solid line + filled markers ---
+        if certain:
+            c_days = [day_of_season(d) for d in certain]
+            c_meds = [np.median(dates_dict[d]) / 1e6 for d in certain]
+            c_lo   = [np.percentile(dates_dict[d],  5) / 1e6 for d in certain]
+            c_hi   = [np.percentile(dates_dict[d], 95) / 1e6 for d in certain]
+            ax.fill_between(c_days, c_lo, c_hi, color=light, alpha=0.7, linewidth=0)
+            ax.plot(c_days, c_meds, "o-", color=colour, linewidth=2,
+                    markersize=6, markerfacecolor=colour,
+                    markeredgewidth=1.5, zorder=3)
+
+        # --- Uncertain dates: faint fill + dashed line + open markers ---
+        if uncertain:
+            u_days = [day_of_season(d) for d in uncertain]
+            u_meds = [np.median(dates_dict[d]) / 1e6 for d in uncertain]
+            u_lo   = [np.percentile(dates_dict[d],  5) / 1e6 for d in uncertain]
+            u_hi   = [np.percentile(dates_dict[d], 95) / 1e6 for d in uncertain]
+            ax.fill_between(u_days, u_lo, u_hi, color=light, alpha=0.25, linewidth=0)
+            ax.plot(u_days, u_meds, "o--", color=colour, linewidth=1.2,
+                    markersize=6, markerfacecolor="white",
+                    markeredgewidth=1.5, alpha=0.6, zorder=3)
+
         legend_handles.append(mpatches.Patch(color=colour, label=yr))
 
     # X-axis ticks: month labels
@@ -212,6 +235,11 @@ def fig_time_series(all_data, save_dir=None):
     ax.grid(axis="y", linestyle="--", linewidth=0.5, alpha=0.6)
     ax.spines[["top", "right"]].set_visible(False)
 
+    import matplotlib.lines as mlines
+    legend_handles.append(
+        mlines.Line2D([0], [0], color="gray", linestyle="--", linewidth=1.2,
+                      marker="o", markerfacecolor="white", markersize=6,
+                      label="Uncertain deployment"))
     ax.legend(handles=legend_handles, title="Year",
               frameon=True, fontsize=10, title_fontsize=10)
 
@@ -253,6 +281,7 @@ def fig_year_comparison(all_data, save_dir=None):
         year_start = x_cursor
 
         for d in sorted_dates:
+            is_uncertain = d.strftime("%Y%m%d") in UNCERTAIN_DATES
             vals = dates_dict[d] / 1e6
             # Clip to 1–99th percentile so extreme outliers don't blow
             # up the bounding box when bbox_inches is computed
@@ -265,13 +294,19 @@ def fig_year_comparison(all_data, save_dir=None):
             density = kde(v_range)
             half_w  = density / density.max() * 0.4
 
+            alpha = 0.25 if is_uncertain else 0.55
             ax.fill_betweenx(v_range,
                              x_cursor - half_w,
                              x_cursor + half_w,
-                             color=YEAR_COLOURS[yr], alpha=0.55)
+                             color=YEAR_COLOURS[yr], alpha=alpha,
+                             hatch="///" if is_uncertain else None,
+                             edgecolor=YEAR_COLOURS[yr] if is_uncertain else None)
             med = np.median(vals)   # median from full distribution
             ax.hlines(med, x_cursor - 0.35, x_cursor + 0.35,
-                      color=YEAR_COLOURS[yr], linewidth=2, zorder=4)
+                      color=YEAR_COLOURS[yr],
+                      linewidth=2 if not is_uncertain else 1,
+                      linestyle="-" if not is_uncertain else "--",
+                      zorder=4, alpha=1.0 if not is_uncertain else 0.5)
 
             # Date label: day + abbreviated month
             label = d.strftime("%-d %b") if sys.platform != "win32" \

@@ -139,9 +139,10 @@ FRAME_WIDTH  = 2704 - (2 * 48)   # 2608 px — sensor width minus padding
 WINGSPAN     = 0.8                # metres
 DARK_PARAMS  = [1.57454778e+01, 9.37398964e-01, 7.18914388e-02, -1.27575036e-04]
 
-# Dates to exclude entirely from population estimation.
-# Source: 22 Deployment.xlsx — "Successful Full round?" = N for all cameras.
-EXCLUDE_DATES = {
+# 2022 dates with confirmed issues (source: 22 Deployment.xlsx).
+# All 7 dates are still processed; these are flagged for context only.
+# Validated (Successful Full round? = Y): 20221101, 20221116, 20221213
+UNCERTAIN_DATES_2022 = {
     "20221107",   # Round 2: heavy rain, tripods blew over
     "20221124",   # Round 4: multiple failures, battery dead
     "20221201",   # Round 5: camera failures, incomplete recordings
@@ -227,8 +228,7 @@ def discover_observations(obs_root):
                 obs = np.load(fpath, allow_pickle=True).item()
             except Exception:
                 continue
-            if date not in EXCLUDE_DATES:
-                all_obs.setdefault(date, {})[camera] = obs
+            all_obs.setdefault(date, {})[camera] = obs
     return all_obs
 
 

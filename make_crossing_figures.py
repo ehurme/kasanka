@@ -35,10 +35,11 @@ OBS_ROOT = (
     r"\Eidolon_helvum\kasanka-bats\observations"
 )
 
-# Dates to flag or exclude — pre-migration noise or failed deployments
-# 2022 failures sourced from 22 Deployment.xlsx ("Successful Full round?" = N)
+# Dates with negligible data
 PRE_MIGRATION = {"30-Oct-2020"}
-FAILED_DEPLOYMENTS = {"20221107", "20221124", "20221201", "20221219"}
+# 2022 dates with confirmed field issues — still shown, but with hollow markers
+# Validated rounds: 20221101, 20221116, 20221213
+UNCERTAIN_DATES = {"20221107", "20221124", "20221201", "20221219"}
 
 # Duplicate date-sets: prefer the long-format name for uniqueness
 # (16Nov == 16-Nov-2020, but they were compiled separately; we keep both
@@ -138,7 +139,7 @@ def load_observations(obs_root):
             "n_in":      n_in,
             "out_frac":  n_out / n_total if n_total > 0 else np.nan,
             "pre_migration": date_str in PRE_MIGRATION,
-            "failed_deployment": date_str in FAILED_DEPLOYMENTS,
+            "failed_deployment": date_str in UNCERTAIN_DATES,
         }
 
     return list(seen.values())
@@ -197,23 +198,32 @@ def make_figure(rows, save_dir=None):
     ax1.set_yscale("log")
 
     for yr in years:
-        yr_rows = [r for r in rows if r["year"] == yr
-                   and not r["pre_migration"] and not r["failed_deployment"]]
-        xs_raw = np.array([x_map[(r["year"], r["date_str"])] for r in yr_rows])
-        ys     = np.array([max(r["n_out"], 1) for r in yr_rows])   # log needs > 0
+        yr_rows = [r for r in rows if r["year"] == yr and not r["pre_migration"]]
+        xs_raw    = np.array([x_map[(r["year"], r["date_str"])] for r in yr_rows])
+        ys        = np.array([max(r["n_out"], 1) for r in yr_rows])
         out_fracs = np.array([r["out_frac"] for r in yr_rows])
+        uncertain = np.array([r["failed_deployment"] for r in yr_rows])
 
-        # Flag reversed cameras (< 30% outward) as hollow red
-        normal   = out_fracs >= 0.30
-        reversed_ = ~normal & ~np.isnan(out_fracs)
+        # Three groups: certain/normal, certain/reversed, uncertain
+        normal    = (out_fracs >= 0.30) & ~uncertain
+        reversed_ = (out_fracs <  0.30) & ~np.isnan(out_fracs) & ~uncertain
+        unc_mask  = uncertain
 
-        ax1.scatter(jitter(xs_raw[normal]),   ys[normal],
-                    color=YEAR_COLOURS[yr], marker=YEAR_MARKERS[yr],
-                    s=40, alpha=0.75, linewidths=0, label=f"{yr}" if yr == years[0] else "")
+        # Certain validated points — solid filled
+        if normal.any():
+            ax1.scatter(jitter(xs_raw[normal]), ys[normal],
+                        color=YEAR_COLOURS[yr], marker=YEAR_MARKERS[yr],
+                        s=40, alpha=0.75, linewidths=0)
+        # Reversed cameras — red X
         if reversed_.any():
             ax1.scatter(jitter(xs_raw[reversed_]), ys[reversed_],
-                        color="red", marker="x", s=60, linewidths=1.5,
-                        zorder=5, label="Reversed camera" if yr == years[0] else "")
+                        color="red", marker="x", s=60, linewidths=1.5, zorder=5)
+        # Uncertain deployment — hollow, faded
+        if unc_mask.any():
+            ax1.scatter(jitter(xs_raw[unc_mask]), ys[unc_mask],
+                        color=YEAR_COLOURS[yr], marker=YEAR_MARKERS[yr],
+                        s=35, alpha=0.35, linewidths=1,
+                        facecolors="none", edgecolors=YEAR_COLOURS[yr])
 
     # Median per date
     for (yr, ds), xpos in x_map.items():
@@ -240,6 +250,10 @@ def make_figure(rows, save_dir=None):
     legend_elements.append(
         mlines.Line2D([0], [0], marker="x", color="red", markersize=8,
                       linewidth=1.5, label="Reversed camera (<30% outward)"))
+    legend_elements.append(
+        mlines.Line2D([0], [0], marker="o", color="gray", markersize=8,
+                      markerfacecolor="none", markeredgewidth=1,
+                      linewidth=0, alpha=0.5, label="Uncertain deployment"))
     ax1.legend(handles=legend_elements, loc="upper left", fontsize=9,
                frameon=True, framealpha=0.9)
 
@@ -253,14 +267,20 @@ def make_figure(rows, save_dir=None):
     ax2.set_facecolor("#F8F8F8")
 
     for yr in years:
-        yr_rows = [r for r in rows if r["year"] == yr
-                   and not r["pre_migration"] and not r["failed_deployment"]]
-        xs_raw = np.array([x_map[(r["year"], r["date_str"])] for r in yr_rows])
-        fracs  = np.array([r["out_frac"] if not np.isnan(r["out_frac"]) else 0.5
-                           for r in yr_rows])
-        ax2.scatter(jitter(xs_raw, 0.3), fracs,
+        yr_rows = [r for r in rows if r["year"] == yr and not r["pre_migration"]]
+        xs_raw    = np.array([x_map[(r["year"], r["date_str"])] for r in yr_rows])
+        fracs     = np.array([r["out_frac"] if not np.isnan(r["out_frac"]) else 0.5
+                              for r in yr_rows])
+        uncertain = np.array([r["failed_deployment"] for r in yr_rows])
+        # Certain points solid, uncertain hollow/faded
+        ax2.scatter(jitter(xs_raw[~uncertain], 0.3), fracs[~uncertain],
                     color=YEAR_COLOURS[yr], marker=YEAR_MARKERS[yr],
                     s=25, alpha=0.7, linewidths=0)
+        if uncertain.any():
+            ax2.scatter(jitter(xs_raw[uncertain], 0.3), fracs[uncertain],
+                        color=YEAR_COLOURS[yr], marker=YEAR_MARKERS[yr],
+                        s=22, alpha=0.3, linewidths=0.8,
+                        facecolors="none", edgecolors=YEAR_COLOURS[yr])
 
     ax2.axhline(0.5, color="#999999", linestyle="--", linewidth=1)
     ax2.axhline(0.3, color="red",     linestyle=":",  linewidth=1, alpha=0.6)
