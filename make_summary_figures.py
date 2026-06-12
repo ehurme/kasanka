@@ -41,8 +41,15 @@ YEAR_FOLDER = {
     "2022": "2022",      # 7 dates: Nov through Dec (add once estimates run)
 }
 
-# Dates to exclude — empty (0) or pre-migration noise
-EXCLUDE_DATES = {"30-Oct-2020"}
+# Dates to exclude — empty (0), pre-migration noise, or failed deployments
+# 2022 failures sourced from 22 Deployment.xlsx ("Successful Full round?" = N)
+EXCLUDE_DATES = {
+    "30-Oct-2020",
+    "20221107",   # heavy rain, tripods blew over
+    "20221124",   # multiple failures
+    "20221201",   # incomplete recordings
+    "20221219",   # failed recordings
+}
 
 # ---------------------------------------------------------------------------
 # Colours per year  (colourblind-safe)

@@ -117,17 +117,18 @@ CAMERA_LOCATIONS = {
     "KKCamera":          [-12.589434,   30.244736],   # KK's Camera = MusolaTower area
     "KK's Camera":       [-12.589434,   30.244736],
 
-    # 2022 numbered camera names  ("N CameraName" format)
-    "1 Fibwe Parking":   [-12.5903393,  30.2525047],
-    "2 BBC":             [-12.5863538,  30.2484985],
-    "3 Chinyangali":     [-12.5851284,  30.245529],
-    "4 Not Chinyangali": [-12.5849206,  30.2436135],
-    "5 Puku":            [-12.584838,   30.24137],
-    "6 Sunset":          [-12.585784,   30.240003],
-    "7 Bupata":          [-12.589337,   30.238492],
-    "8 Musola Path":     [-12.589544,   30.242488],
-    "9 KK":              [-12.589434,   30.244736],
-    "10 Fibwe Management": [-12.592537, 30.2515924],
+    # 2022 numbered camera names — GPS from 22 Deployment.xlsx (mean across valid rounds)
+    # These positions differ from earlier years; cameras were repositioned each deployment.
+    "1 Fibwe Parking":     [-12.591127,  30.252812],
+    "2 BBC":               [-12.585629,  30.251253],
+    "3 Chinyangali":       [-12.582324,  30.250244],
+    "4 Not Chinyangali":   [-12.583024,  30.245623],
+    "5 Puku":              [-12.583147,  30.240842],
+    "6 Sunset":            [-12.585768,  30.239975],
+    "7 Bupata":            [-12.590427,  30.238381],
+    "8 Musola Path":       [-12.592753,  30.242034],
+    "9 KK":                [-12.594063,  30.246678],
+    "10 Fibwe Management": [-12.593827,  30.250030],
 }
 
 # ---------------------------------------------------------------------------
@@ -137,6 +138,15 @@ CAMERA_LOCATIONS = {
 FRAME_WIDTH  = 2704 - (2 * 48)   # 2608 px — sensor width minus padding
 WINGSPAN     = 0.8                # metres
 DARK_PARAMS  = [1.57454778e+01, 9.37398964e-01, 7.18914388e-02, -1.27575036e-04]
+
+# Dates to exclude entirely from population estimation.
+# Source: 22 Deployment.xlsx — "Successful Full round?" = N for all cameras.
+EXCLUDE_DATES = {
+    "20221107",   # Round 2: heavy rain, tripods blew over
+    "20221124",   # Round 4: multiple failures, battery dead
+    "20221201",   # Round 5: camera failures, incomplete recordings
+    "20221219",   # Round 7: failed recordings
+}
 
 FOREST_BORDER = [
     [-12.585957, 30.242762],
@@ -217,7 +227,8 @@ def discover_observations(obs_root):
                 obs = np.load(fpath, allow_pickle=True).item()
             except Exception:
                 continue
-            all_obs.setdefault(date, {})[camera] = obs
+            if date not in EXCLUDE_DATES:
+                all_obs.setdefault(date, {})[camera] = obs
     return all_obs
 
 

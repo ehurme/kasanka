@@ -35,8 +35,10 @@ OBS_ROOT = (
     r"\Eidolon_helvum\kasanka-bats\observations"
 )
 
-# Dates that are known pre-migration (nearly no bats)
+# Dates to flag or exclude — pre-migration noise or failed deployments
+# 2022 failures sourced from 22 Deployment.xlsx ("Successful Full round?" = N)
 PRE_MIGRATION = {"30-Oct-2020"}
+FAILED_DEPLOYMENTS = {"20221107", "20221124", "20221201", "20221219"}
 
 # Duplicate date-sets: prefer the long-format name for uniqueness
 # (16Nov == 16-Nov-2020, but they were compiled separately; we keep both
@@ -136,6 +138,7 @@ def load_observations(obs_root):
             "n_in":      n_in,
             "out_frac":  n_out / n_total if n_total > 0 else np.nan,
             "pre_migration": date_str in PRE_MIGRATION,
+            "failed_deployment": date_str in FAILED_DEPLOYMENTS,
         }
 
     return list(seen.values())
@@ -194,7 +197,8 @@ def make_figure(rows, save_dir=None):
     ax1.set_yscale("log")
 
     for yr in years:
-        yr_rows = [r for r in rows if r["year"] == yr and not r["pre_migration"]]
+        yr_rows = [r for r in rows if r["year"] == yr
+                   and not r["pre_migration"] and not r["failed_deployment"]]
         xs_raw = np.array([x_map[(r["year"], r["date_str"])] for r in yr_rows])
         ys     = np.array([max(r["n_out"], 1) for r in yr_rows])   # log needs > 0
         out_fracs = np.array([r["out_frac"] for r in yr_rows])
@@ -249,7 +253,8 @@ def make_figure(rows, save_dir=None):
     ax2.set_facecolor("#F8F8F8")
 
     for yr in years:
-        yr_rows = [r for r in rows if r["year"] == yr and not r["pre_migration"]]
+        yr_rows = [r for r in rows if r["year"] == yr
+                   and not r["pre_migration"] and not r["failed_deployment"]]
         xs_raw = np.array([x_map[(r["year"], r["date_str"])] for r in yr_rows])
         fracs  = np.array([r["out_frac"] if not np.isnan(r["out_frac"]) else 0.5
                            for r in yr_rows])
