@@ -179,9 +179,6 @@ def track_chunk(chunk_dict):
     contour_files = sorted(
         glob.glob(os.path.join(camera_folder, "contours-compressed-*.npy"))
     )
-    # Skip first contour file (matches notebook behaviour)
-    if len(contour_files) > 1:
-        contour_files = contour_files[1:]
 
     cam_name = os.path.basename(camera_folder)
     print(f"    [{cam_name}] chunk {first_frame}–{max_frame} ...", flush=True)

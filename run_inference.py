@@ -141,7 +141,9 @@ def load_model(model_file):
     from bat_seg_models import UNETTraditional
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = UNETTraditional(1, 2, should_pad=False)
-    model.load_state_dict(torch.load(model_file, map_location=device, weights_only=False))
+    state_dict = torch.load(model_file, map_location="cpu", weights_only=False)
+    model.load_state_dict(state_dict)
+    del state_dict
     model.to(device)
     model.train(False)
     return model, device
@@ -159,7 +161,7 @@ def make_augmentor(mean, std, channel):
 
 class BatVideoReader:
     """Iterate frames from a list of video files, skipping too-dark frames."""
-    def __init__(self, video_files, augmentor, max_bad_reads=300):
+    def __init__(self, video_files, augmentor, max_bad_reads=10):
         self.video_files  = video_files
         self.augmentor    = augmentor
         self.max_bad_reads = max_bad_reads
